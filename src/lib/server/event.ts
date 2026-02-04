@@ -1,9 +1,15 @@
 import { db } from '$lib/server/db';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { events, eventJoins, eventSessions } from '$lib/server/db/schema';
-import { createSession, type SessionWithToken } from '$lib/server/session';
+import { createSession, validateSessionToken, type SessionWithToken } from '$lib/server/session';
 
 export type EventId = number;
+
+export interface ValidatedEventSession {
+	sessionId: string;
+	isHost: boolean;
+	playerName?: string;
+}
 
 interface EventSessionWithToken {
 	session: SessionWithToken;
@@ -89,4 +95,73 @@ export async function getEvent(eventId: EventId) {
 
 export async function listEvents() {
 	return db.select().from(events).where(eq(events.started, 0)).all();
+}
+
+export async function getEventSession(
+	eventId: EventId,
+	token: string | undefined
+): Promise<ValidatedEventSession | null> {
+	if (!token) {
+		return null;
+	}
+
+	const getSession = async (sessionId: string) => {
+		const session = db
+			.select({ secretHash: eventSessions.secretHash })
+			.from(eventSessions)
+			.where(and(eq(eventSessions.eventSessionId, sessionId), eq(eventSessions.eventId, eventId)))
+			.get();
+		if (!session) {
+			return null;
+		}
+		return {
+			id: sessionId,
+			secretHash: new Uint8Array(session.secretHash as ArrayBuffer)
+		};
+	};
+
+	const session = await validateSessionToken(token, getSession);
+	if (!session) {
+		return null;
+	}
+
+	const sessionData = db
+		.select({ host: eventSessions.host })
+		.from(eventSessions)
+		.where(eq(eventSessions.eventSessionId, session.id))
+		.get();
+
+	if (!sessionData) {
+		return null;
+	}
+
+	const joinData = db
+		.select({ playerName: eventJoins.playerName })
+		.from(eventJoins)
+		.where(eq(eventJoins.eventSessionId, session.id))
+		.get();
+
+	return {
+		sessionId: session.id,
+		isHost: sessionData.host,
+		playerName: joinData?.playerName
+	};
+}
+
+export function joinEventAsHost(sessionId: string, name: string): void {
+	db.insert(eventJoins)
+		.values({
+			eventSessionId: sessionId,
+			playerName: name.trim()
+		})
+		.run();
+}
+
+export function getEventPlayers(eventId: EventId) {
+	return db
+		.select({ playerName: eventJoins.playerName })
+		.from(eventJoins)
+		.innerJoin(eventSessions, eq(eventJoins.eventSessionId, eventSessions.eventSessionId))
+		.where(eq(eventSessions.eventId, eventId))
+		.all();
 }

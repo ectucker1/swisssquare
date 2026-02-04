@@ -3,7 +3,7 @@ import { createEvent, listEvents } from '$lib/server/event';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
-	const availableEvents = listEvents();
+	const availableEvents = await listEvents();
 	return { availableEvents };
 };
 
@@ -27,6 +27,6 @@ export const actions = {
 
 		cookies.set(`event_${eventSession.eventId}_session`, eventSession.session.token, { path: '/' });
 
-		redirect(303, `events/${eventSession.eventId}/manage`);
+		redirect(303, `events/${eventSession.eventId}`);
 	}
 } satisfies Actions;

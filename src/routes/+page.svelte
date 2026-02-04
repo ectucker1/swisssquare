@@ -36,7 +36,7 @@
 					<strong>{event.name}</strong>
 					<span class="format">{event.format}</span>
 				</span>
-				<a href="events/{event.eventId}/join">
+				<a href="events/{event.eventId}">
 					<button type="button">Join</button>
 				</a>
 			</li>

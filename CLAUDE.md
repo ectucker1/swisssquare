@@ -44,6 +44,22 @@ npm run db:studio    # Open Drizzle Studio GUI
 - `src/lib/server/db/` - Database layer
   - `schema.ts` - Drizzle table definitions
   - `index.ts` - Database connection (server-only)
+- `src/lib/server/session.ts` - Session token generation and validation
+- `src/lib/server/event.ts` - Event creation, joining, and queries
+
+## Session Architecture
+
+Sessions identify devices that have created or joined events. Adapted from [Lucia Auth](https://lucia-auth.com/sessions/basic).
+
+**Token format**: `{sessionId}.{secret}` - a human-readable 24-character ID and secret (using alphabet without ambiguous characters like l/1/o/0).
+
+**Storage**: Only the SHA-256 hash of the secret is stored in `eventSessions.secretHash`. The full token is returned to the client on creation.
+
+**Validation**: `validateSessionToken()` splits the token, looks up the session by ID, then uses constant-time comparison to verify the secret hash.
+
+**Database tables**:
+- `eventSessions` - Links session IDs to events, stores secret hash and `host` boolean
+- `eventJoins` - Links sessions to player names (only for non-host sessions that joined as players)
 
 ## Testing
 
